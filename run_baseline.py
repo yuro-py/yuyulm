@@ -11,10 +11,10 @@ from bench import measure_generate, measure_perplexity, print_report
 
 MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 tok = AutoTokenizer.from_pretrained(MODEL)
-model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=torch.float16).to("cuda")
+model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float16).to("cuda")
 model.eval()
 
-msgs = [{"role": "user", "content": "are u stupid?"}]
+msgs = [{"role": "user", "content": "write random words"}]
 ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt")
 if hasattr(ids, "input_ids"):
     ids = ids.input_ids

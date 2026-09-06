@@ -94,14 +94,23 @@ class ManualQwen2(nn.Module):
             prefix = f"model.layers.{i}."
             normed = rmsnorm(hidden_states, self.sd[prefix + "input_layernorm.weight"])
 
+            # 1. Project using the original 2-head weights
             q_proj = F.linear(normed, self.sd[prefix + "self_attn.q_proj.weight"]) + self.sd[prefix + "self_attn.q_proj.bias"]
             k_proj = F.linear(normed, self.sd[prefix + "self_attn.k_proj.weight"]) + self.sd[prefix + "self_attn.k_proj.bias"]
             v_proj = F.linear(normed, self.sd[prefix + "self_attn.v_proj.weight"]) + self.sd[prefix + "self_attn.v_proj.bias"]
 
-            q = q_proj.view(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)
-            k = k_proj.view(batch_size, seq_len, num_kv_heads, head_dim).transpose(1, 2)
-            v = v_proj.view(batch_size, seq_len, num_kv_heads, head_dim).transpose(1, 2)
+            # --- MHA SIMULATION BLOCK ---
+            # Expand the 2 KV heads (128 features) to 14 heads (896 features) 
+            # to simulate true MHA memory and compute footprint.
+            k_proj = k_proj.view(batch_size, seq_len, num_kv_heads, head_dim).repeat_interleave(num_heads // num_kv_heads, dim=2).reshape(batch_size, seq_len, num_heads * head_dim)
+            v_proj = v_proj.view(batch_size, seq_len, num_kv_heads, head_dim).repeat_interleave(num_heads // num_kv_heads, dim=2).reshape(batch_size, seq_len, num_heads * head_dim)
 
+            # 2. Reshape into 14 heads for ALL tensors (Q, K, and V)
+            q = q_proj.view(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)
+            k = k_proj.view(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)  # Now uses num_heads
+            v = v_proj.view(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)  # Now uses num_heads
+
+            
             q = q.to(torch.float32)
             k = k.to(torch.float32)
 
@@ -118,8 +127,8 @@ class ManualQwen2(nn.Module):
                 new_past_key_values.append((k.to(torch.float16), v.to(torch.float16)))
 
             # GQA broadcasting
-            k = k.repeat_interleave(num_heads // num_kv_heads, dim=1)
-            v = v.repeat_interleave(num_heads // num_kv_heads, dim=1)
+            # k = k.repeat_interleave(num_heads // num_kv_heads, dim=1)
+            # v = v.repeat_interleave(num_heads // num_kv_heads, dim=1)
 
             attn_weights = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(head_dim)
             attn_weights = attn_weights + causal_mask
