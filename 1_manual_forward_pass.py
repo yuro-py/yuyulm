@@ -83,9 +83,11 @@ class ManualQwen2(nn.Module):
             prefix = f"model.layers.{i}."
             normed = rmsnorm(hidden_states, self.sd[prefix + "input_layernorm.weight"])
             
-            q_proj = F.linear(normed, self.sd[prefix + "self_attn.q_proj.weight"])
-            k_proj = F.linear(normed, self.sd[prefix + "self_attn.k_proj.weight"])
-            v_proj = F.linear(normed, self.sd[prefix + "self_attn.v_proj.weight"])
+
+            q_proj = F.linear(normed, self.sd[prefix + "self_attn.q_proj.weight"]) + self.sd[prefix + "self_attn.q_proj.bias"]
+            k_proj = F.linear(normed, self.sd[prefix + "self_attn.k_proj.weight"]) + self.sd[prefix + "self_attn.k_proj.bias"]
+            v_proj = F.linear(normed, self.sd[prefix + "self_attn.v_proj.weight"]) + self.sd[prefix + "self_attn.v_proj.bias"]
+
 
             q = q_proj.view(batch_size, seq_len, num_heads, head_dim).transpose(1, 2)
             k = k_proj.view(batch_size, seq_len, num_kv_heads, head_dim).transpose(1, 2)
