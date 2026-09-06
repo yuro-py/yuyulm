@@ -1,8 +1,13 @@
+import time
+start = time.time()
+#------------------
+
 # run_baseline.py — verifies stock model runs, no custom code touched.
-# This is your golden reference: never modify this file after it's working.
+# This is the ground reference: dont modify this file after getting the ground logits.
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from bench import measure_generate, measure_perplexity, print_report
+
 
 MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 tok = AutoTokenizer.from_pretrained(MODEL)
@@ -26,7 +31,13 @@ fixed_ids = tok(FIXED_TEXT, return_tensors="pt").input_ids.to("cuda")
 ppl = measure_perplexity(model, fixed_ids)
 print(f"perplexity on fixed text: {ppl:.3f}")
 
-# golden logits for exact-match comparison in step B
+# ground logits for exact-match comparison in step B
 with torch.no_grad():
     outputs = model(ids, attention_mask=attn_mask)
-    torch.save(outputs.logits, "golden_logits.pt")
+    torch.save(outputs.logits, "ground_logits.pt")
+
+
+
+#--------------------
+end = time.time()
+print("seconds taken :",end - start)
